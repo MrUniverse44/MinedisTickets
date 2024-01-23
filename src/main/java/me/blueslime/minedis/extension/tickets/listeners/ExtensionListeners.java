@@ -64,8 +64,6 @@ public class ExtensionListeners extends ListenerAdapter {
                     ticket
             );
 
-            PrivateChannel channel = event.getChannel().asPrivateChannel();
-
             User user = event.getUser();
 
             event.deferReply(true).queue(
@@ -90,27 +88,6 @@ public class ExtensionListeners extends ListenerAdapter {
                     )
                 ).queueAfter(1, TimeUnit.SECONDS)
             );
-
-            channel.sendMessageEmbeds(
-                    new EmbedSection(
-                            plugin.getConfiguration().getSection("embeds.ticket-created")
-                    ).build(
-                            TextReplacer.builder()
-                                .replace(
-                                    "%user id%",
-                                    user.getId()
-                                ).replace(
-                                    "%user name%",
-                                    user.getName()
-                                ).replace(
-                                    "%user effective name%",
-                                    user.getEffectiveName()
-                                ).replace(
-                                    "%user global name%",
-                                    user.getGlobalName() == null ? user.getName() : user.getGlobalName()
-                                )
-                    )
-            ).queue();
         } else {
             event.reply("You already have a ticket open.").queue();
         }
