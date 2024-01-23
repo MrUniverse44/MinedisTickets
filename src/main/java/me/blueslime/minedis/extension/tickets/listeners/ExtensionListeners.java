@@ -6,6 +6,7 @@ import me.blueslime.minedis.extension.tickets.ticket.Ticket;
 import me.blueslime.minedis.extension.tickets.ticket.button.TicketButton;
 import me.blueslime.minedis.extension.tickets.ticket.types.TicketType;
 import me.blueslime.minedis.extension.tickets.utils.EmbedSection;
+import me.blueslime.minedis.extension.tickets.utils.Leaderboard;
 import me.blueslime.minedis.extension.tickets.utils.TicketFile;
 import me.blueslime.minedis.utils.text.TextReplacer;
 import net.dv8tion.jda.api.entities.Guild;
@@ -25,14 +26,16 @@ import net.dv8tion.jda.api.utils.FileUpload;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class ChatListener extends ListenerAdapter {
+public class ExtensionListeners extends ListenerAdapter {
 
     private final MinedisTickets plugin;
 
-    public ChatListener(MinedisTickets plugin) {
+    public ExtensionListeners(MinedisTickets plugin) {
         this.plugin = plugin;
     }
 
@@ -127,19 +130,51 @@ public class ChatListener extends ListenerAdapter {
             if (event.isFromType(ChannelType.TEXT)) {
                 TextChannel channel = event.getChannel().asTextChannel();
 
-                if (event.getMessage().getContentRaw().startsWith("!assist")) {
-                    if (plugin.getTickets().contains(channel)) {
-                        String channelID = plugin.getTickets().getChannelMap().get(
-                                channel.getId()
-                        );
+                String guildID = plugin.getConfiguration().getString("settings.guild-id", "NOT_SET");
 
-                        if (channelID == null) {
+                if (!guildID.isEmpty() && !guildID.equalsIgnoreCase("NOT_SET") && !guildID.equalsIgnoreCase("NOT-SET")) {
+                    Guild guild = plugin.getJDA().getGuildById(
+                        guildID
+                    );
+
+                    if (guild != null) {
+                        if (event.getMessage().getContentRaw().startsWith("!assists")) {
+                            int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getEffectiveName(), 0);
+
+                            channel.sendMessage(event.getAuthor().getAsMention() + " you have " + total + " assist(s).").queue();
                             return;
                         }
+                        if (event.getMessage().getContentRaw().startsWith("!leaderboard")) {
+                            Map<String, Integer> staffMap = new HashMap<>();
 
-                        Ticket ticket = plugin.getTickets().getTicketMap().get(
-                                channelID
-                        );
+                            for (String key : plugin.getConfiguration().getSection("assists").getKeys()) {
+                                staffMap.put(
+                                    key,
+                                    plugin.getConfiguration().getInt("assists." + key, 0)
+                                );
+                            }
+
+                            StringBuilder builder = new StringBuilder("\n");
+
+                            int position = 1;
+
+                            for (Map.Entry<String, Integer> entry : Leaderboard.sort(staffMap)) {
+                                builder.append(position)
+                                        .append(". **")
+                                        .append(entry.getKey())
+                                        .append(": **")
+                                        .append(entry.getValue())
+                                        .append("\n");
+                                position++;
+                            }
+                            channel.sendMessage("# Tickets Leaderboard" + builder.toString()).queue();
+                            return;
+                        }
+                    }
+                }
+                if (event.getMessage().getContentRaw().startsWith("!assist")) {
+                    if (plugin.getTickets().contains(channel)) {
+                        Ticket ticket = fetchTicketChannel(channel);
 
                         if (ticket == null) {
                             return;
@@ -158,6 +193,8 @@ public class ChatListener extends ListenerAdapter {
                             total++;
 
                             plugin.getConfiguration().set("assists." + event.getAuthor().getEffectiveName(), total);
+                            plugin.saveConfiguration();
+                            plugin.reloadConfiguration();
 
                             User user = plugin.getJDA().getUserById(
                                     ticket.getUser()
@@ -207,18 +244,7 @@ public class ChatListener extends ListenerAdapter {
                 }
                 if (event.getMessage().getContentRaw().startsWith("!close")) {
                     if (plugin.getTickets().contains(channel)) {
-                        String channelID = plugin.getTickets().getChannelMap().get(
-                                channel.getId()
-                        );
-
-                        if (channelID == null) {
-                            channel.sendMessage("Ticket-ID was not found").queue();
-                            return;
-                        }
-
-                        Ticket ticket = plugin.getTickets().getTicketMap().get(
-                                channelID
-                        );
+                        Ticket ticket = fetchTicketChannel(channel);
 
                         if (ticket == null) {
                             channel.sendMessage("Ticket was not found").queue();
@@ -262,8 +288,6 @@ public class ChatListener extends ListenerAdapter {
                                 return;
                             }
 
-                            String guildID = plugin.getConfiguration().getString("settings.guild-id", "NOT_SET");
-
                             if (guildID.isEmpty() || guildID.equalsIgnoreCase("NOT_SET") || guildID.equalsIgnoreCase("NOT-SET")) {
                                 plugin.getLogger().info("Guild is not set for ticket-id: " + ticket.getId());
                                 return;
@@ -300,20 +324,79 @@ public class ChatListener extends ListenerAdapter {
                     }
                     return;
                 }
-                if (event.getMessage().getContentRaw().startsWith("!reply ")) {
+                if (event.getMessage().getContentRaw().startsWith("!leave ")) {
                     if (plugin.getTickets().contains(channel)) {
-                        String channelID = plugin.getTickets().getChannelMap().get(
-                                channel.getId()
-                        );
+                        Ticket ticket = fetchTicketChannel(channel);
 
-                        if (channelID == null) {
-                            channel.sendMessage("Ticket-ID was not found").queue();
+                        if (ticket == null) {
+                            channel.sendMessage("Ticket was not found").queue();
                             return;
                         }
 
-                        Ticket ticket = plugin.getTickets().getTicketMap().get(
-                                channelID
-                        );
+                        if (ticket.isAssistant(event.getAuthor())) {
+                            User user = plugin.getJDA().getUserById(
+                                    ticket.getUser()
+                            );
+
+                            if (user == null) {
+                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                return;
+                            }
+
+                            ticket.setAssistant("NOT_SET");
+                            ticket.setState(TicketState.WAITING_RESPONSE);
+                            ticket.update(plugin);
+
+                            int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getEffectiveName(), 0);
+
+                            total--;
+
+                            plugin.getConfiguration().set("assists." + event.getAuthor().getEffectiveName(), total);
+                            plugin.saveConfiguration();
+                            plugin.reloadConfiguration();
+
+                            channel.sendMessage("Now you are not the assist of this ticket " + event.getAuthor().getAsMention() + ". Waiting for other assistant").queue();
+                            return;
+                        } else {
+                            channel.sendMessage("Only the assistant can chat with the user, using **!reply ** prefix.").queue();
+                        }
+                    }
+                    return;
+                }
+                if (event.getMessage().getContentRaw().startsWith("!rename ")) {
+                    if (plugin.getTickets().contains(channel)) {
+                        Ticket ticket = fetchTicketChannel(channel);
+
+                        if (ticket == null) {
+                            channel.sendMessage("Ticket was not found").queue();
+                            return;
+                        }
+
+                        if (ticket.isAssistant(event.getAuthor())) {
+                            String name = event.getMessage().getContentRaw().replace("!rename ", "");
+
+                            User user = plugin.getJDA().getUserById(
+                                    ticket.getUser()
+                            );
+
+                            if (user == null) {
+                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                return;
+                            }
+
+                            if (name.length() >= 2) {
+                                channel.getManager().setName(name).queue();
+                            }
+                            return;
+                        } else {
+                            channel.sendMessage("Only the assistant can chat with the user, using **!reply ** prefix.").queue();
+                        }
+                    }
+                    return;
+                }
+                if (event.getMessage().getContentRaw().startsWith("!reply ")) {
+                    if (plugin.getTickets().contains(channel)) {
+                        Ticket ticket = fetchTicketChannel(channel);
 
                         if (ticket == null) {
                             channel.sendMessage("Ticket was not found").queue();
@@ -332,21 +415,68 @@ public class ChatListener extends ListenerAdapter {
                                 return;
                             }
 
-                            user.openPrivateChannel().queue(
-                                userChannel -> {
-                                    if (userChannel != null && userChannel.canTalk()) {
-                                        userChannel.sendMessage(
-                                            message
-                                        ).queue();
-                                        channel.sendMessage(
-                                            "Your message has been sent to the player!"
-                                        ).queue();
-                                    } else {
-                                        channel.sendMessage(
-                                            "This user has MD disabled for bots, the bot can't chat with this user.."
-                                        ).queue();
+                            List<Message.Attachment> attachments = event.getMessage().getAttachments();
+
+                            if (attachments.isEmpty()) {
+                                user.openPrivateChannel().queue(
+                                    userChannel -> {
+                                        if (userChannel != null && userChannel.canTalk()) {
+                                            userChannel.sendMessage(
+                                                message
+                                            ).queue();
+                                            channel.sendMessage(
+                                                "Your message has been sent to the player!"
+                                            ).queue();
+                                        } else {
+                                            channel.sendMessage(
+                                                "This user has MD disabled for bots, the bot can't chat with this user.."
+                                            ).queue();
+                                        }
                                     }
+                                );
+                                return;
+                            }
+
+                            File folder = TicketFile.getTicketCaptures(plugin, ticket);
+
+                            List<File> fileList = new ArrayList<>();
+
+                            for (Message.Attachment attachment : attachments) {
+                                if (attachment.isImage() || attachment.isVideo()) {
+                                    try {
+                                        attachment.getProxy().downloadToFile(
+                                                new File(
+                                                        folder,
+                                                        event.getAuthor().getName() + "-" + attachment.getFileName() + (attachment.getFileExtension() != null ? attachment.getFileExtension() : "")
+                                                )
+                                        ).thenAccept(
+                                                fileList::add
+                                        );
+                                    } catch (Exception ignored) {}
                                 }
+                            }
+
+                            List<FileUpload> uploads = new ArrayList<>();
+
+                            fileList.forEach(f -> uploads.add(FileUpload.fromData(f)));
+
+                            FileUpload[] array = uploads.toArray(new FileUpload[fileList.size()]);
+
+                            user.openPrivateChannel().queue(
+                                    userChannel -> {
+                                        if (userChannel != null && userChannel.canTalk()) {
+                                            userChannel.sendMessage(
+                                                    message
+                                            ).setFiles(array).queue();
+                                            channel.sendMessage(
+                                                    "Your message has been sent to the player!"
+                                            ).queue();
+                                        } else {
+                                            channel.sendMessage(
+                                                    "This user has MD disabled for bots, the bot can't chat with this user.."
+                                            ).queue();
+                                        }
+                                    }
                             );
                             return;
                         } else {
@@ -426,7 +556,7 @@ public class ChatListener extends ListenerAdapter {
                                 attachment.getProxy().downloadToFile(
                                     new File(
                                         folder,
-                                        attachment.getFileName() + (attachment.getFileExtension() != null ? attachment.getFileExtension() : "")
+                                        event.getAuthor().getName() + "-" + attachment.getFileName() + (attachment.getFileExtension() != null ? attachment.getFileExtension() : "")
                                     )
                                 ).thenAccept(
                                         fileList::add
@@ -451,5 +581,20 @@ public class ChatListener extends ListenerAdapter {
                 }
             }
         }
+    }
+
+    private Ticket fetchTicketChannel(TextChannel channel) {
+        String channelID = plugin.getTickets().getChannelMap().get(
+                channel.getId()
+        );
+
+        if (channelID == null) {
+            channel.sendMessage("Ticket-ID was not found").queue();
+            return null;
+        }
+
+        return plugin.getTickets().getTicketMap().get(
+                channelID
+        );
     }
 }

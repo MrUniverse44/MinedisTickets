@@ -1,6 +1,6 @@
 package me.blueslime.minedis.extension.tickets;
 
-import me.blueslime.minedis.extension.tickets.listeners.ChatListener;
+import me.blueslime.minedis.extension.tickets.listeners.ExtensionListeners;
 import me.blueslime.minedis.extension.tickets.ticket.Tickets;
 import me.blueslime.minedis.extension.tickets.ticket.types.TicketType;
 import me.blueslime.minedis.api.extension.MinedisExtension;
@@ -83,7 +83,7 @@ public final class MinedisTickets extends MinedisExtension {
         reloadConfiguration();
 
         registerEventListeners(
-            new ChatListener(this)
+            new ExtensionListeners(this)
         );
 
         registerCommands();
