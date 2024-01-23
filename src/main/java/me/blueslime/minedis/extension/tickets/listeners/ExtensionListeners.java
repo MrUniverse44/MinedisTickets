@@ -9,10 +9,7 @@ import me.blueslime.minedis.extension.tickets.utils.EmbedSection;
 import me.blueslime.minedis.extension.tickets.utils.Leaderboard;
 import me.blueslime.minedis.extension.tickets.utils.TicketFile;
 import me.blueslime.minedis.utils.text.TextReplacer;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.MessageEmbed;
-import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
@@ -196,12 +193,10 @@ public class ExtensionListeners extends ListenerAdapter {
                             plugin.saveConfiguration();
                             plugin.reloadConfiguration();
 
-                            User user = plugin.getJDA().getUserById(
-                                    ticket.getUser()
-                            );
+                            User user = fetchUser(ticket.getUser());
 
                             if (user == null) {
-                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                channel.sendMessage("Can't find this user").queue();
                                 return;
                             }
 
@@ -252,12 +247,11 @@ public class ExtensionListeners extends ListenerAdapter {
                         }
 
                         if (ticket.isAssistant(event.getAuthor())) {
-                            User user = plugin.getJDA().getUserById(
-                                    ticket.getUser()
-                            );
+
+                            User user = fetchUser(ticket.getUser());
 
                             if (user == null) {
-                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                channel.sendMessage("Can't find this user").queue();
                                 return;
                             }
 
@@ -334,12 +328,10 @@ public class ExtensionListeners extends ListenerAdapter {
                         }
 
                         if (ticket.isAssistant(event.getAuthor())) {
-                            User user = plugin.getJDA().getUserById(
-                                    ticket.getUser()
-                            );
+                            User user = fetchUser(ticket.getUser());
 
                             if (user == null) {
-                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                channel.sendMessage("Can't find this user").queue();
                                 return;
                             }
 
@@ -375,12 +367,10 @@ public class ExtensionListeners extends ListenerAdapter {
                         if (ticket.isAssistant(event.getAuthor())) {
                             String name = event.getMessage().getContentRaw().replace("!rename ", "");
 
-                            User user = plugin.getJDA().getUserById(
-                                    ticket.getUser()
-                            );
+                            User user = fetchUser(ticket.getUser());
 
                             if (user == null) {
-                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                channel.sendMessage("Can't find this user").queue();
                                 return;
                             }
 
@@ -406,12 +396,10 @@ public class ExtensionListeners extends ListenerAdapter {
                         if (ticket.isAssistant(event.getAuthor())) {
                             String message = event.getMessage().getContentRaw().replace("!reply ", "");
 
-                            User user = plugin.getJDA().getUserById(
-                                    ticket.getUser()
-                            );
+                            User user = fetchUser(ticket.getUser());
 
                             if (user == null) {
-                                channel.sendMessage("User has been disconnected from your guilds, please delete this ticket because the user can't reply again.").queue();
+                                channel.sendMessage("Can't find this user").queue();
                                 return;
                             }
 
@@ -495,20 +483,20 @@ public class ExtensionListeners extends ListenerAdapter {
                 MessageEmbed embed = new EmbedSection(
                         plugin.getConfiguration().getSection("embeds.help")
                 ).build(
-                        TextReplacer.builder()
-                                .replace(
-                                        "%user id%",
-                                        user.getId()
-                                ).replace(
-                                        "%user name%",
-                                        user.getName()
-                                ).replace(
-                                        "%user effective name%",
-                                        user.getEffectiveName()
-                                ).replace(
-                                        "%user global name%",
-                                        user.getGlobalName() == null ? user.getName() : user.getGlobalName()
-                                )
+                    TextReplacer.builder()
+                        .replace(
+                            "%user id%",
+                            user.getId()
+                        ).replace(
+                            "%user name%",
+                            user.getName()
+                        ).replace(
+                            "%user effective name%",
+                            user.getEffectiveName()
+                        ).replace(
+                            "%user global name%",
+                            user.getGlobalName() == null ? user.getName() : user.getGlobalName()
+                        )
                 );
 
                 List<Button> buttons = new ArrayList<>();
@@ -581,6 +569,38 @@ public class ExtensionListeners extends ListenerAdapter {
                 }
             }
         }
+    }
+
+    private User fetchUser(String id) {
+        User user = plugin.getJDA().getUserById(id);
+
+        if (user != null) {
+            return user;
+        }
+
+        String guildID = plugin.getConfiguration().getString("settings.users-guild-id", "NOT_SET");
+
+        if (guildID.isEmpty() || guildID.equalsIgnoreCase("NOT_SET") || guildID.equalsIgnoreCase("NOT-SET")) {
+            plugin.getLogger().info("Guild is not set for find user id: " + id);
+            return null;
+        }
+
+        Guild guild = plugin.getJDA().getGuildById(
+                guildID
+        );
+
+        if (guild == null) {
+            plugin.getLogger().info("Guild was not found for find user id: " + id);
+            return null;
+        }
+
+        Member member = guild.getMemberById(id);
+
+        if (member != null) {
+            return member.getUser();
+        }
+
+        return null;
     }
 
     private Ticket fetchTicketChannel(TextChannel channel) {

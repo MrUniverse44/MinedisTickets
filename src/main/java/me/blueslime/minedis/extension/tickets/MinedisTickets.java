@@ -27,6 +27,10 @@ public final class MinedisTickets extends MinedisExtension {
             getConfiguration().set("settings.guild-id", "NOT_SET");
         }
 
+        if (!getConfiguration().contains("settings.users-guild-id")) {
+            getConfiguration().set("settings.users-guild-id", "NOT_SET");
+        }
+
         for (TicketType type : TicketType.values()) {
             if (!getConfiguration().contains(type.getCategoryPath())) {
                 getConfiguration().set(type.getCategoryPath(), "NOT_SET");
