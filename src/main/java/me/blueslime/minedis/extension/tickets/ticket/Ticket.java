@@ -204,11 +204,6 @@ public class Ticket {
         this.work = true;
 
         update(plugin);
-
-        plugin.getTickets().getChannelMap().put(
-            id,
-            user
-        );
     }
 
     public boolean isAssistant(Member member) {

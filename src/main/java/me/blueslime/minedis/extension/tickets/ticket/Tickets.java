@@ -48,6 +48,11 @@ public class Tickets {
                                 ticket
                             );
                         }
+
+                        channelMap.put(
+                            ticket.getId(),
+                            ticket.getUser()
+                        );
                     } catch (IOException ignored) {
 
                     }
