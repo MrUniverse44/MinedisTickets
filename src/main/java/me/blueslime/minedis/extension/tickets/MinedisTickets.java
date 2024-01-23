@@ -99,7 +99,9 @@ public final class MinedisTickets extends MinedisExtension {
     public void onDisable() {
         getLogger().info("Unloading Tickets Extension of Minedis");
 
-        tickets.unload();
+        if (tickets != null) {
+            tickets.unload();
+        }
     }
 
     public Tickets getTickets() {
