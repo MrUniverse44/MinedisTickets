@@ -211,6 +211,9 @@ public class Ticket {
     }
 
     public boolean isAssistant(User user) {
+        if (assistant.equalsIgnoreCase("NOT_SET") || assistant.equalsIgnoreCase("NOT-SET")) {
+            state = TicketState.WITHOUT_ASSISTANT;
+        }
         return assistant.equalsIgnoreCase(user.getId());
     }
 
@@ -264,7 +267,7 @@ public class Ticket {
 
                 ticketConfiguration.set("ticket.channel-id", this.id);
                 ticketConfiguration.set("ticket.user-name", this.name);
-                ticketConfiguration.set("ticket.assistant", "NOT_SET");
+                ticketConfiguration.set("ticket.assistant", this.assistant);
                 ticketConfiguration.set("ticket.user-id", this.user);
                 ticketConfiguration.set("ticket.state", state.toString());
                 ticketConfiguration.set("ticket.type", type.toString());
