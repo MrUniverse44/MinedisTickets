@@ -22,11 +22,9 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.utils.FileUpload;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class ExtensionListeners extends ListenerAdapter {
 
@@ -427,28 +425,23 @@ public class ExtensionListeners extends ListenerAdapter {
 
                             File folder = TicketFile.getTicketCaptures(plugin, ticket);
 
-                            List<File> fileList = new ArrayList<>();
+                            List<File> fileList = attachments.stream()
+                                    .filter(attachment -> attachment.isImage() || attachment.isVideo())
+                                    .map(attachment -> {
+                                        File file = new File(folder, event.getAuthor().getName() + "-" + attachment.getFileName());
+                                        try {
+                                            attachment.getProxy().downloadToFile(file).get();
+                                            return file;
+                                        } catch (Exception e) {
+                                            plugin.getLogger().info("Can't download file from ticket: " + file.getName());
+                                            e.printStackTrace();
+                                            return null;
+                                        }
+                                    })
+                                    .filter(Objects::nonNull)
+                                    .collect(Collectors.toList());
 
-                            for (Message.Attachment attachment : attachments) {
-                                if (attachment.isImage() || attachment.isVideo()) {
-                                    try {
-                                        attachment.getProxy().downloadToFile(
-                                                new File(
-                                                        folder,
-                                                        event.getAuthor().getName() + "-" + attachment.getFileName() + (attachment.getFileExtension() != null ? attachment.getFileExtension() : "")
-                                                )
-                                        ).thenAccept(
-                                                fileList::add
-                                        );
-                                    } catch (Exception ignored) {}
-                                }
-                            }
-
-                            List<FileUpload> uploads = new ArrayList<>();
-
-                            fileList.forEach(f -> uploads.add(FileUpload.fromData(f)));
-
-                            FileUpload[] array = uploads.toArray(new FileUpload[fileList.size()]);
+                            FileUpload[] array = fileList.stream().map(FileUpload::fromData).toArray(FileUpload[]::new);
 
                             user.openPrivateChannel().queue(
                                     userChannel -> {
@@ -536,28 +529,23 @@ public class ExtensionListeners extends ListenerAdapter {
 
                     File folder = TicketFile.getTicketCaptures(plugin, ticket);
 
-                    List<File> fileList = new ArrayList<>();
-
-                    for (Message.Attachment attachment : attachments) {
-                        if (attachment.isImage() || attachment.isVideo()) {
+                    List<File> fileList = attachments.stream()
+                        .filter(attachment -> attachment.isImage() || attachment.isVideo())
+                        .map(attachment -> {
+                            File file = new File(folder, event.getAuthor().getName() + "-" + attachment.getFileName());
                             try {
-                                attachment.getProxy().downloadToFile(
-                                    new File(
-                                        folder,
-                                        event.getAuthor().getName() + "-" + attachment.getFileName() + (attachment.getFileExtension() != null ? attachment.getFileExtension() : "")
-                                    )
-                                ).thenAccept(
-                                        fileList::add
-                                );
-                            } catch (Exception ignored) {}
-                        }
-                    }
+                                attachment.getProxy().downloadToFile(file).get();
+                                return file;
+                            } catch (Exception e) {
+                                plugin.getLogger().info("Can't download file from ticket: " + file.getName());
+                                e.printStackTrace();
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
 
-                    List<FileUpload> uploads = new ArrayList<>();
-
-                    fileList.forEach(f -> uploads.add(FileUpload.fromData(f)));
-
-                    FileUpload[] array = uploads.toArray(new FileUpload[fileList.size()]);
+                    FileUpload[] array = fileList.stream().map(FileUpload::fromData).toArray(FileUpload[]::new);
 
                     if (ticketChannel != null) {
                         ticketChannel.sendMessage(
