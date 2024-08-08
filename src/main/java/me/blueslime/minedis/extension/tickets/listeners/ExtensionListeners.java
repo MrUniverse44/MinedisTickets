@@ -443,7 +443,7 @@ public class ExtensionListeners extends ListenerAdapter {
                                     }
 
                                     ticket.setAssistant("NOT_SET");
-                                    ticket.setState(TicketState.WAITING_RESPONSE);
+                                    ticket.setState(TicketState.WITHOUT_ASSISTANT);
                                     ticket.update(plugin);
 
                                     plugin.saveConfiguration();
