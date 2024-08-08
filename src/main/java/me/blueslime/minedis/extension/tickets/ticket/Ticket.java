@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 
 public class Ticket {
+    private String description = "";
     private final String name;
     private final String user;
     private TicketState state;
@@ -165,6 +166,7 @@ public class Ticket {
                 ticketConfiguration.set("ticket.user-name", this.name);
                 ticketConfiguration.set("ticket.assistant", "NOT_SET");
                 ticketConfiguration.set("ticket.user-id", this.user);
+                ticketConfiguration.set("ticket.description", this.description);
                 ticketConfiguration.set("ticket.state", state.toString());
                 ticketConfiguration.set("ticket.type", type.toString());
 
@@ -180,6 +182,7 @@ public class Ticket {
     public Ticket(MinedisTickets plugin, File file) throws IOException {
         Configuration configuration = ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
 
+        this.description = configuration.getString("ticket.description", "");
         this.assistant = configuration.getString("ticket.assistant", "NOT_SET");
         this.name = configuration.getString("ticket.user-name");
         this.user = configuration.getString("ticket.user-id");
@@ -225,6 +228,10 @@ public class Ticket {
         this.state = state;
     }
 
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public TicketState getState() {
         return state;
     }
@@ -267,9 +274,11 @@ public class Ticket {
 
                 ticketConfiguration.set("ticket.channel-id", this.id);
                 ticketConfiguration.set("ticket.user-name", this.name);
+                ticketConfiguration.set("ticket.description", this.description);
                 ticketConfiguration.set("ticket.assistant", this.assistant);
                 ticketConfiguration.set("ticket.user-id", this.user);
                 ticketConfiguration.set("ticket.state", state.toString());
+                ticketConfiguration.set("ticket.description", "");
                 ticketConfiguration.set("ticket.type", type.toString());
 
                 ConfigurationProvider.getProvider(YamlConfiguration.class).save(ticketConfiguration, ticketFile);
@@ -281,5 +290,18 @@ public class Ticket {
 
     public TicketType getType() {
         return type;
+    }
+
+    public String getUserId() {
+        return user;
+    }
+
+    public File getFile(MinedisTickets plugin) {
+        File folder = TicketFile.getTicketFolder(plugin);
+        return new File(folder, this.user + ".yml");
+    }
+
+    public String getDescription() {
+        return description;
     }
 }

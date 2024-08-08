@@ -165,16 +165,24 @@ public class EmbedSection {
         return builder.build();
     }
 
+    public void addField(EmbedField field) {
+        fieldList.add(field);
+    }
+
     public static class EmbedField {
 
         private final boolean inline;
         private final String value;
         private final String name;
 
-        public EmbedField(boolean inline, String name, String value) {
+        private EmbedField(boolean inline, String name, String value) {
             this.inline = inline;
             this.value = value;
             this.name = name;
+        }
+
+        public static EmbedField createField(boolean inline, String name, String value) {
+            return new EmbedField(inline, name, value);
         }
 
         public boolean isInline() {

@@ -5,7 +5,9 @@ import java.util.Locale;
 public enum TicketState {
     WITHOUT_ASSISTANT,
     WAITING_RESPONSE,
-    IN_PROCESS;
+    IN_PROCESS,
+    SOLVED,
+    REJECTED;
 
     @Override
     public String toString() {

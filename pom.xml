@@ -78,7 +78,7 @@
         <dependency>
             <groupId>com.github.MrUniverse44</groupId>
             <artifactId>Minedis</artifactId>
-            <version>1.0.1.0</version>
+            <version>1.0.4</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

@@ -110,13 +110,46 @@ public class ExtensionListeners extends ListenerAdapter {
                     );
 
                     if (guild != null) {
-                        if (event.getMessage().getContentRaw().startsWith("!assists")) {
-                            int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getEffectiveName(), 0);
+                        String contentRaw = event.getMessage().getContentRaw();
 
-                            channel.sendMessage(event.getAuthor().getAsMention() + " you have " + total + " assist(s).").queue();
+                        if (
+                            contentRaw.startsWith("!ticket assists") || contentRaw.startsWith("!tickets assists") ||
+                            contentRaw.startsWith("!t stats") || contentRaw.startsWith("!t info") || contentRaw.startsWith("!t assists") ||
+                            contentRaw.startsWith("!tickets stats") || contentRaw.startsWith("!tickets info") ||
+                            contentRaw.startsWith("!ticket stats") || contentRaw.startsWith("!ticket info")
+                        ) {
+                            int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getName(), 0);
+
+                            channel.sendMessageEmbeds(
+                                new EmbedSection(
+                                    plugin.getConfiguration().getSection("embed.assists")
+                                ).build(
+                                    TextReplacer.builder()
+                                        .replace("<mention>", event.getAuthor().getAsMention())
+                                        .replace("<assists>", String.valueOf(total))
+                                )
+                            ).queue();
                             return;
                         }
-                        if (event.getMessage().getContentRaw().startsWith("!leaderboard")) {
+
+                        if (
+                            contentRaw.startsWith("!ticket help") || contentRaw.startsWith("!tickets help") || contentRaw.startsWith("!t help")
+                        ) {
+                            channel.sendMessageEmbeds(
+                                new EmbedSection(
+                                    plugin.getConfiguration().getSection("embeds.ticket-help-command")
+                                ).build()
+                            ).queue();
+                        }
+
+                        if (
+                            contentRaw.startsWith("!ticket leaderboard") || contentRaw.startsWith("!ticket leader") ||
+                            contentRaw.startsWith("!tickets leaderboard") || contentRaw.startsWith("!tickets leader") ||
+                            contentRaw.startsWith("!ticket lb") || contentRaw.startsWith("!ticket top") ||
+                            contentRaw.startsWith("!t leaderboard") || contentRaw.startsWith("!t leader") ||
+                            contentRaw.startsWith("!t lb") || contentRaw.startsWith("!t top") ||
+                            contentRaw.startsWith("!tickets lb") || contentRaw.startsWith("!tickets top")
+                        ) {
                             Map<String, Integer> staffMap = new HashMap<>();
 
                             for (String key : plugin.getConfiguration().getSection("assists").getKeys()) {
@@ -126,25 +159,78 @@ public class ExtensionListeners extends ListenerAdapter {
                                 );
                             }
 
-                            StringBuilder builder = new StringBuilder("\n");
-
                             int position = 1;
 
+                            EmbedSection section = new EmbedSection(plugin.getConfiguration().getSection("embeds.leaderboard"));
+
                             for (Map.Entry<String, Integer> entry : Leaderboard.sort(staffMap)) {
-                                builder.append(position)
-                                        .append(". **")
-                                        .append(entry.getKey())
-                                        .append(": **")
-                                        .append(entry.getValue())
-                                        .append("\n");
+                                section.addField(
+                                    EmbedSection.EmbedField.createField(
+                                        false,
+                                        "Top " + position + ". " + entry.getKey(),
+                                        entry.getValue() + " - " + getStaffTime(entry.getKey())
+                                    )
+                                );
                                 position++;
                             }
-                            channel.sendMessage("# Tickets Leaderboard" + builder.toString()).queue();
+
+                            channel.sendMessageEmbeds(section.build()).queue();
                             return;
                         }
                     }
                 }
-                if (event.getMessage().getContentRaw().startsWith("!assist")) {
+
+                String contentRaw = event.getMessage().getContentRaw();
+
+                if (
+                    contentRaw.startsWith("!t discharge") ||
+                    contentRaw.startsWith("!ticket discharge") ||
+                    contentRaw.startsWith("!tickets discharge")
+                ) {
+                    if (plugin.getTickets().contains(channel)) {
+                        Ticket ticket = fetchTicketChannel(channel);
+
+                        if (ticket == null) {
+                            return;
+                        }
+
+                        if (ticket.getState() == TicketState.IN_PROCESS) {
+
+                            ticket.setAssistant("NOT_SET");
+                            ticket.setState(TicketState.WITHOUT_ASSISTANT);
+                            ticket.update(plugin);
+
+                            channel.sendMessage(event.getAuthor().getAsMention() + " completed.").queue();
+                        }
+                    }
+                    return;
+                }
+
+                if (
+                    contentRaw.startsWith("!t id") ||
+                    contentRaw.startsWith("!ticket id") ||
+                    contentRaw.startsWith("!tickets id")
+                ) {
+                    if (plugin.getTickets().contains(channel)) {
+                        Ticket ticket = fetchTicketChannel(channel);
+
+                        if (ticket == null) {
+                            return;
+                        }
+
+                        channel.sendMessage(event.getAuthor().getAsMention() + " user id: " + ticket.getUserId()).queue();
+                    }
+                    return;
+                }
+
+                if (
+                    contentRaw.startsWith("!ticket assist") ||
+                    contentRaw.startsWith("!tickets assist") ||
+                    contentRaw.startsWith("!t assist") ||
+                    contentRaw.startsWith("!ticket claim") ||
+                    contentRaw.startsWith("!tickets claim") ||
+                    contentRaw.startsWith("!t claim")
+                ) {
                     if (plugin.getTickets().contains(channel)) {
                         Ticket ticket = fetchTicketChannel(channel);
 
@@ -153,18 +239,20 @@ public class ExtensionListeners extends ListenerAdapter {
                         }
 
                         if (ticket.getState() == TicketState.WITHOUT_ASSISTANT) {
-                            channel.sendMessage(event.getAuthor().getAsMention() + " now you are the assistant of this ticket.").queue();
+
+
+                            channel.sendMessage("**" + event.getAuthor().getName() + "** now you are an assistant.").queue();
                             ticket.setAssistant(event.getAuthor().getId());
                             ticket.setState(TicketState.IN_PROCESS);
 
 
                             ticket.update(plugin);
 
-                            int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getEffectiveName(), 0);
+                            int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getName(), 0);
 
                             total++;
 
-                            plugin.getConfiguration().set("assists." + event.getAuthor().getEffectiveName(), total);
+                            plugin.getConfiguration().set("assists." + event.getAuthor().getName(), total);
                             plugin.saveConfiguration();
                             plugin.reloadConfiguration();
 
@@ -179,28 +267,28 @@ public class ExtensionListeners extends ListenerAdapter {
                                         userChannel -> {
                                             if (userChannel != null && userChannel.canTalk()) {
                                                 userChannel.sendMessageEmbeds(
-                                                        new EmbedSection(
-                                                                plugin.getConfiguration().getSection("embeds.assistant-assigned")
-                                                        ).build(
-                                                                TextReplacer.builder()
-                                                                        .replace(
-                                                                                "%user id%",
-                                                                                user.getId()
-                                                                        ).replace(
-                                                                                "%user name%",
-                                                                                user.getName()
-                                                                        ).replace(
-                                                                                "%user effective name%",
-                                                                                user.getEffectiveName()
-                                                                        ).replace(
-                                                                                "%user global name%",
-                                                                                user.getGlobalName() == null ? user.getName() : user.getGlobalName()
-                                                                        )
-                                                        )
+                                                    new EmbedSection(
+                                                            plugin.getConfiguration().getSection("embeds.assistant-assigned")
+                                                    ).build(
+                                                        TextReplacer.builder()
+                                                            .replace(
+                                                                "%user id%",
+                                                                user.getId()
+                                                            ).replace(
+                                                                "%user name%",
+                                                                user.getName()
+                                                            ).replace(
+                                                                "%user effective name%",
+                                                                user.getEffectiveName()
+                                                            ).replace(
+                                                                "%user global name%",
+                                                                user.getGlobalName() == null ? user.getName() : user.getGlobalName()
+                                                            )
+                                                    )
                                                 ).queue();
                                             } else {
                                                 channel.sendMessage(
-                                                        "This user has MD disabled for bots, the bot can't chat with this user.."
+                                                    "This user has MD disabled for bots, the bot can't chat with this user.."
                                                 ).queue();
                                             }
                                         }
@@ -214,7 +302,11 @@ public class ExtensionListeners extends ListenerAdapter {
                         return;
                     }
                 }
-                if (event.getMessage().getContentRaw().startsWith("!close")) {
+                if (
+                    contentRaw.startsWith("!t close") ||
+                    contentRaw.startsWith("!ticket close") ||
+                    contentRaw.startsWith("!tickets close")
+                ) {
                     if (plugin.getTickets().contains(channel)) {
                         Ticket ticket = fetchTicketChannel(channel);
 
@@ -248,7 +340,7 @@ public class ExtensionListeners extends ListenerAdapter {
                                     );
 
                                     channel.sendMessage(
-                                            "Ticket has been closed."
+                                        "Ticket has been closed."
                                     ).queue();
 
                                     String categoryID = plugin.getConfiguration().getString(ticket.getType().getCategoryPath(), "NOT_SET");
@@ -258,24 +350,14 @@ public class ExtensionListeners extends ListenerAdapter {
                                         return;
                                     }
 
-                                    if (guildID.isEmpty() || guildID.equalsIgnoreCase("NOT_SET") || guildID.equalsIgnoreCase("NOT-SET")) {
-                                        plugin.getLogger().info("Guild is not set for ticket-id: " + ticket.getId());
+                                    Category category = channel.getGuild().getCategoryById(categoryID);
+
+                                    if (category == null) {
                                         return;
                                     }
-
-                                    Guild guild = plugin.getJDA().getGuildById(
-                                            guildID
-                                    );
-
-                                    if (guild == null) {
-                                        plugin.getLogger().info("Guild was not found for ticket-id: " + ticket.getId());
-                                        return;
-                                    }
-
-                                    Category category = guild.getCategoryById(categoryID);
 
                                     channel.getManager().setParent(
-                                            category
+                                        category
                                     ).queue();
 
                                     File file = new File(TicketFile.getTicketFolder(plugin), ticket.getUser() + ".yml");
@@ -296,7 +378,11 @@ public class ExtensionListeners extends ListenerAdapter {
                     }
                     return;
                 }
-                if (event.getMessage().getContentRaw().startsWith("!leave ")) {
+                if (
+                    contentRaw.startsWith("!ticket leave") ||
+                    contentRaw.startsWith("!t leave") ||
+                    contentRaw.startsWith("!tickets leave")
+                ) {
                     if (plugin.getTickets().contains(channel)) {
                         Ticket ticket = fetchTicketChannel(channel);
 
@@ -317,25 +403,29 @@ public class ExtensionListeners extends ListenerAdapter {
                                     ticket.setState(TicketState.WAITING_RESPONSE);
                                     ticket.update(plugin);
 
-                                    int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getEffectiveName(), 0);
+                                    int total = plugin.getConfiguration().getInt("assists." + event.getAuthor().getName(), 0);
 
                                     total--;
 
-                                    plugin.getConfiguration().set("assists." + event.getAuthor().getEffectiveName(), total);
+                                    plugin.getConfiguration().set("assists." + event.getAuthor().getName(), total);
                                     plugin.saveConfiguration();
                                     plugin.reloadConfiguration();
 
-                                    channel.sendMessage("Now you are not the assist of this ticket " + event.getAuthor().getAsMention() + ". Waiting for other assistant").queue();
+                                    channel.sendMessage("Waiting for other assistant").queue();
                                 }
                             );
                             return;
                         } else {
-                            channel.sendMessage("Only the assistant can chat with the user, using **!reply ** prefix.").queue();
+                            channel.sendMessage("Only the assistant can chat with the user, using **!ticket reply ** prefix.").queue();
                         }
                     }
                     return;
                 }
-                if (event.getMessage().getContentRaw().startsWith("!rename ")) {
+                if (
+                    contentRaw.startsWith("!ticket transfer") ||
+                    contentRaw.startsWith("!t transfer") ||
+                    contentRaw.startsWith("!tickets transfer")
+                ) {
                     if (plugin.getTickets().contains(channel)) {
                         Ticket ticket = fetchTicketChannel(channel);
 
@@ -345,7 +435,66 @@ public class ExtensionListeners extends ListenerAdapter {
                         }
 
                         if (ticket.isAssistant(event.getAuthor())) {
-                            String name = event.getMessage().getContentRaw().replace("!rename ", "");
+                            plugin.getJDA().retrieveUserById(ticket.getUser()).queue(
+                                user -> {
+                                    if (user == null) {
+                                        channel.sendMessage("Can't find this user").queue();
+                                        return;
+                                    }
+
+                                    ticket.setAssistant("NOT_SET");
+                                    ticket.setState(TicketState.WAITING_RESPONSE);
+                                    ticket.update(plugin);
+
+                                    plugin.saveConfiguration();
+                                    plugin.reloadConfiguration();
+
+                                    channel.sendMessage("Waiting for other assistant").queue();
+                                }
+                            );
+                            return;
+                        } else {
+                            channel.sendMessage("Only the assistant can chat with the user, using **!ticket reply ** prefix.").queue();
+                        }
+                    }
+                    return;
+                }
+                if (
+                    contentRaw.startsWith("!t rename") ||
+                    contentRaw.startsWith("!ticket rename") ||
+                    contentRaw.startsWith("!tickets rename") ||
+                    contentRaw.startsWith("!t rn") ||
+                    contentRaw.startsWith("!ticket rn") ||
+                    contentRaw.startsWith("!tickets rn")
+                ) {
+                    if (plugin.getTickets().contains(channel)) {
+                        Ticket ticket = fetchTicketChannel(channel);
+
+                        if (ticket == null) {
+                            channel.sendMessage("Ticket was not found").queue();
+                            return;
+                        }
+
+                        if (ticket.isAssistant(event.getAuthor())) {
+                            String name = contentRaw.replace("!t rename ", "")
+                                .replace("!ticket rename ", "")
+                                .replace("!tickets rename ", "")
+                                .replace("!t rn ", "")
+                                .replace("!tickets rn ", "")
+                                .replace("!ticket rn ", "")
+                                .replace("!t rename", "")
+                                .replace("!ticket rename", "")
+                                .replace("!tickets rename", "")
+                                .replace("!t rn", "")
+                                .replace("!tickets rn", "")
+                                .replace("!ticket rn", "")
+                                .replace(" ", "-");
+
+                            if (name.length() <= 2) {
+                                channel.sendMessage(
+                                        "Correct usage: **!t r (channel name)**, nombres muy cortos no son aceptados."
+                                ).queue();
+                            }
 
                             plugin.getJDA().retrieveUserById(ticket.getUser()).queue(
                                 user -> {
@@ -366,7 +515,15 @@ public class ExtensionListeners extends ListenerAdapter {
                     }
                     return;
                 }
-                if (event.getMessage().getContentRaw().startsWith("!reply ")) {
+                if (
+                    contentRaw.startsWith("!t reply ") ||
+                    contentRaw.startsWith("!t r") ||
+                    contentRaw.startsWith("!ticket reply ") ||
+                    contentRaw.startsWith("!tickets reply ") ||
+                    contentRaw.startsWith("!ticket r ") ||
+                    contentRaw.startsWith("!tickets r ")
+                ) {
+
                     if (plugin.getTickets().contains(channel)) {
                         Ticket ticket = fetchTicketChannel(channel);
 
@@ -376,7 +533,13 @@ public class ExtensionListeners extends ListenerAdapter {
                         }
 
                         if (ticket.isAssistant(event.getAuthor())) {
-                            String message = event.getMessage().getContentRaw().replace("!reply ", "");
+                            String message = contentRaw
+                                .replace("!tickets reply ", "")
+                                .replace("!t reply ", "")
+                                .replace("!ticket reply ", "")
+                                .replace("!t r ", "")
+                                .replace("!tickets r ", "")
+                                .replace("!ticket r ", "");
 
                             plugin.getJDA().retrieveUserById(ticket.getUser()).queue(
                                     user -> {
@@ -392,10 +555,13 @@ public class ExtensionListeners extends ListenerAdapter {
                                                     userChannel -> {
                                                         if (userChannel != null && userChannel.canTalk()) {
                                                             userChannel.sendMessage(
-                                                                    message
+                                                                message
                                                             ).queue();
                                                             channel.sendMessage(
-                                                                    "Your message has been sent to the player!"
+                                                                    "Message has been sent, Preview:"
+                                                            ).queue();
+                                                            channel.sendMessage(
+                                                                message
                                                             ).queue();
                                                         } else {
                                                             channel.sendMessage(
@@ -433,9 +599,14 @@ public class ExtensionListeners extends ListenerAdapter {
                                                         userChannel.sendMessage(
                                                                 message
                                                         ).setFiles(array).queue();
+
                                                         channel.sendMessage(
-                                                                "Your message has been sent to the player!"
+                                                                "Message sent, Preview:"
                                                         ).queue();
+
+                                                        channel.sendMessage(
+                                                            message
+                                                        ).setFiles(array).queue();
                                                     } else {
                                                         channel.sendMessage(
                                                                 "This user has MD disabled for bots, the bot can't chat with this user.."
@@ -447,7 +618,7 @@ public class ExtensionListeners extends ListenerAdapter {
                             );
                             return;
                         } else {
-                            channel.sendMessage("Only the assistant can chat with the user, using **!reply ** prefix.").queue();
+                            channel.sendMessage("Only the assistant can chat with the user, using **!ticket reply ** prefix.").queue();
                         }
                     }
                 }
@@ -543,6 +714,10 @@ public class ExtensionListeners extends ListenerAdapter {
                 }
             }
         }
+    }
+
+    public String getStaffTime(String staffId) {
+        return "0d 0h 0m 0s";
     }
 
     private Ticket fetchTicketChannel(TextChannel channel) {
